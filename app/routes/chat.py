@@ -1,6 +1,9 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List
+import time
+
+from app.cache.semantic_cache import cache
 
 router = APIRouter()
 
@@ -19,8 +22,22 @@ class ChatResponse(BaseModel):
 
 @router.post("/chat/completions", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    query = request.messages[-1].content
+    start = time.time()
+
+    # Check cache first
+    cached = cache.get(query)
+    if cached:
+        latency = (time.time() - start) * 1000
+        return ChatResponse(
+            response=cached["response"],
+            cache_status="HIT",
+            latency_ms=round(latency, 2)
+        )
+
+    # Cache miss — LLM call coming Day 3
     return ChatResponse(
-        response="QueryGuard is alive.",
+        response="[LLM call coming Day 3]",
         cache_status="MISS",
-        latency_ms=0.0
+        latency_ms=round((time.time() - start) * 1000, 2)
     )
