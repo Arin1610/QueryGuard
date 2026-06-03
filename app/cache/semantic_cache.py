@@ -1,12 +1,16 @@
 import chromadb
 from app.cache.embedder import embedder
 
-SIMILARITY_THRESHOLD = 0.92
+SIMILARITY_THRESHOLD = 0.90
 
 class SemanticCache:
-    def __init__(self):
+    def __init__(self, threshold: float = SIMILARITY_THRESHOLD):
+        self.threshold = threshold
         self.client = chromadb.Client()
-        self.collection = self.client.get_or_create_collection("query_cache")
+        self.collection = self.client.get_or_create_collection(
+            name=f"query_cache_{str(threshold).replace('.', '_')}",
+            metadata={"hnsw:space": "cosine"}
+        )
 
     def get(self, query: str):
         """Check cache. Return cached response if similar query exists."""
@@ -20,9 +24,11 @@ class SemanticCache:
             return None
 
         distance = results["distances"][0][0]
-        similarity = 1 - distance
+        similarity = 1 - distance  # cosine distance → similarity
 
-        if similarity >= SIMILARITY_THRESHOLD:
+        print(f"Similarity: {similarity:.4f} (threshold: {self.threshold})")
+
+        if similarity >= self.threshold:
             return {
                 "response": results["documents"][0][0],
                 "similarity": similarity
